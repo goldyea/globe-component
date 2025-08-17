@@ -27,7 +27,7 @@ html {
 }
         `}</style>
       </head>
-      <body className="bg-slate-950 text-slate-100">
+      <body className="bg-slate-950 text-slate-100" suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
