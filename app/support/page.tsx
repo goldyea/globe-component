@@ -8,13 +8,17 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Clock, MessageSquare, HelpCircle, ExternalLink } from "lucide-react"
 import { MainLayout } from "@/components/layout/main-layout"
+import { useUser } from "@/hooks/use-user" // Import useUser
 
+// These stats will remain mock for now as they require more complex aggregation
 const supportStats = [
   { label: "Avg. Response Time", value: "< 2 hours", icon: Clock, color: "text-green-400" },
   { label: "Active Tickets", value: "3", icon: MessageSquare, color: "text-blue-400" },
 ]
 
 export default function SupportPage() {
+  const { user, isLoading: isUserLoading } = useUser();
+
   return (
     <MainLayout>
       <div className="space-y-8">

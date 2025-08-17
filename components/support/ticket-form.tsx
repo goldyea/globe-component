@@ -11,6 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, Clock, Send } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { useUser } from "@/hooks/use-user"
+import { toast } from "sonner"
 
 const priorityLevels = [
   { value: "low", label: "Low - General inquiry", color: "bg-green-500/20 text-green-400" },
@@ -30,12 +33,15 @@ const categories = [
 ]
 
 export function TicketForm() {
+  const { user, isLoading: isUserLoading } = useUser()
+  const supabase = createClient()
+
   const [formData, setFormData] = useState({
     subject: "",
     category: "",
     priority: "",
     description: "",
-    vpsId: "",
+    vpsId: "", // This field is not in the DB schema, will be ignored or added to description
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -44,13 +50,54 @@ export function TicketForm() {
     e.preventDefault()
     setIsSubmitting(true)
 
-    console.log("[v0] Submitting support ticket:", formData)
+    if (!user) {
+      toast.error("You must be logged in to submit a ticket.")
+      setIsSubmitting(false)
+      return
+    }
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    const { subject, category, priority, description } = formData;
 
-    setIsSubmitting(false)
-    // Reset form or show success message
+    if (!subject || !category || !priority || !description) {
+      toast.error("Please fill in all required fields.")
+      setIsSubmitting(false)
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("support_tickets")
+        .insert([
+          {
+            user_id: user.id,
+            subject,
+            category,
+            priority,
+            description,
+            // vps_id: formData.vpsId || null, // If you want to add vps_id to the schema later
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success("Support ticket submitted successfully!");
+      setFormData({
+        subject: "",
+        category: "",
+        priority: "",
+        description: "",
+        vpsId: "",
+      });
+    } catch (error: any) {
+      console.error("Error submitting ticket:", error);
+      toast.error(`Failed to submit ticket: ${error.message || "An unexpected error occurred."}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   const selectedPriority = priorityLevels.find((p) => p.value === formData.priority)
@@ -177,7 +224,7 @@ export function TicketForm() {
               type="submit"
               className="bg-blue-600 hover:bg-blue-700 text-white"
               disabled={
-                isSubmitting || !formData.subject || !formData.category || !formData.priority || !formData.description
+                isSubmitting || isUserLoading || !formData.subject || !formData.category || !formData.priority || !formData.description
               }
             >
               {isSubmitting ? (

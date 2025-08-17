@@ -12,12 +12,14 @@ import {
 import { useAuth } from "@/hooks/use-auth"
 import { Breadcrumb } from "./breadcrumb"
 import { usePathname } from "next/navigation"
+import { useUser } from "@/hooks/use-user" // Import the new hook
 
 export function TopBar() {
-  const { user, logout } = useAuth()
+  const { logout } = useAuth()
+  const { user, profile, isLoading: isUserLoading } = useUser() // Use the new useUser hook
   const pathname = usePathname()
 
-  const showBreadcrumb = pathname.startsWith("/docs")
+  const showBreadcrumb = pathname.startsWith("/docs") || pathname.startsWith("/admin") || pathname.startsWith("/store") || pathname.startsWith("/vps/")
   const pageTitle =
     pathname === "/dashboard"
       ? "Dashboard"
@@ -35,7 +37,11 @@ export function TopBar() {
                   ? "Terms of Service"
                   : pathname === "/privacy"
                     ? "Privacy Policy"
-                    : "Dashboard"
+                    : pathname === "/store"
+                      ? "Resource Store"
+                      : pathname.startsWith("/admin")
+                        ? "Admin Panel"
+                        : "Dashboard"
 
   return (
     <div className="glass h-16 px-6 flex items-center justify-between border-b border-slate-700/50 fixed top-0 right-0 left-64 z-30">
@@ -47,6 +53,7 @@ export function TopBar() {
         {/* Notifications */}
         <Button variant="ghost" size="sm" className="relative text-slate-300 hover:text-slate-100">
           <Bell className="h-5 w-5" />
+          {/* Placeholder for notification count */}
           <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full text-xs"></span>
         </Button>
 
@@ -55,9 +62,13 @@ export function TopBar() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center gap-2 text-slate-300 hover:text-slate-100">
               <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center">
-                <span className="text-sm font-medium text-white">{user?.username?.charAt(0).toUpperCase()}</span>
+                <span className="text-sm font-medium text-white">
+                  {isUserLoading ? "" : profile?.username?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "U"}
+                </span>
               </div>
-              <span className="text-sm font-medium">{user?.username}</span>
+              <span className="text-sm font-medium">
+                {isUserLoading ? "Loading..." : profile?.username || user?.email || "Guest"}
+              </span>
               <ChevronDown className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>

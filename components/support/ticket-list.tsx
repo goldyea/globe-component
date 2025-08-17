@@ -1,55 +1,29 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Clock, MessageSquare, Search, Filter, Eye } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { useUser } from "@/hooks/use-user"
+import Link from "next/link"
+import { Skeleton } from "@/components/ui/loading-skeleton"
+import { InlineError } from "@/components/ui/error-state"
 
-const mockTickets = [
-  {
-    id: "TKT-001",
-    subject: "Server not responding",
-    category: "Technical Support",
-    priority: "high",
-    status: "open",
-    created: "2024-01-15T10:30:00Z",
-    updated: "2024-01-15T14:20:00Z",
-    messages: 3,
-  },
-  {
-    id: "TKT-002",
-    subject: "Billing question about upgrade",
-    category: "Billing & Account",
-    priority: "medium",
-    status: "pending",
-    created: "2024-01-14T16:45:00Z",
-    updated: "2024-01-15T09:15:00Z",
-    messages: 2,
-  },
-  {
-    id: "TKT-003",
-    subject: "Request for additional IP address",
-    category: "Feature Request",
-    priority: "low",
-    status: "resolved",
-    created: "2024-01-12T11:20:00Z",
-    updated: "2024-01-13T15:30:00Z",
-    messages: 5,
-  },
-  {
-    id: "TKT-004",
-    subject: "High CPU usage investigation",
-    category: "Server Performance",
-    priority: "medium",
-    status: "in-progress",
-    created: "2024-01-10T08:15:00Z",
-    updated: "2024-01-15T12:45:00Z",
-    messages: 7,
-  },
-]
+interface SupportTicket {
+  id: string
+  user_id: string
+  subject: string
+  category: string
+  priority: "low" | "medium" | "high" | "urgent"
+  status: "open" | "in-progress" | "pending" | "resolved" | "closed"
+  created_at: string
+  updated_at: string
+  messages: number // This will be a count from a join or separate query
+}
 
 const statusColors = {
   open: "bg-blue-500/20 text-blue-400 border-blue-500/30",
@@ -67,19 +41,85 @@ const priorityColors = {
 }
 
 export function TicketList() {
+  const { user, isAdmin, isLoading: isUserLoading, isError: isUserError, error: userError } = useUser()
+  const supabase = createClient()
+
+  const [tickets, setTickets] = useState<SupportTicket[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [priorityFilter, setPriorityFilter] = useState("all")
 
-  const filteredTickets = mockTickets.filter((ticket) => {
+  const fetchTickets = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+
+    if (!user) {
+      setLoading(false)
+      return;
+    }
+
+    try {
+      let query = supabase
+        .from("support_tickets")
+        .select(`
+          id,
+          user_id,
+          subject,
+          category,
+          priority,
+          status,
+          created_at,
+          updated_at,
+          ticket_messages(count)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (!isAdmin) {
+        query = query.eq("user_id", user.id);
+      }
+
+      if (statusFilter !== "all") {
+        query = query.eq("status", statusFilter);
+      }
+
+      if (priorityFilter !== "all") {
+        query = query.eq("priority", priorityFilter);
+      }
+
+      const { data, error: fetchError } = await query;
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      const formattedTickets: SupportTicket[] = data.map((ticket: any) => ({
+        ...ticket,
+        messages: ticket.ticket_messages[0]?.count || 0,
+      }));
+
+      setTickets(formattedTickets);
+    } catch (err: any) {
+      console.error("Error fetching tickets:", err);
+      setError(err.message || "Failed to load tickets.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user, isAdmin, statusFilter, priorityFilter, supabase]);
+
+  useEffect(() => {
+    if (!isUserLoading) {
+      fetchTickets();
+    }
+  }, [isUserLoading, fetchTickets]);
+
+  const filteredTickets = tickets.filter((ticket) => {
     const matchesSearch =
       ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || ticket.status === statusFilter
-    const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter
-
-    return matchesSearch && matchesStatus && matchesPriority
-  })
+      ticket.id.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -87,13 +127,47 @@ export function TicketList() {
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    })
+    });
+  };
+
+  if (isUserLoading) {
+    return (
+      <Card className="glass-card">
+        <CardHeader>
+          <Skeleton className="h-6 w-48 mb-2" />
+          <Skeleton className="h-4 w-64" />
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Skeleton className="h-10 flex-1" />
+            <Skeleton className="h-10 w-[140px]" />
+            <Skeleton className="h-10 w-[140px]" />
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isUserError) {
+    return <InlineError message={userError || "Failed to load user data."} onRetry={fetchTickets} />;
+  }
+
+  if (!user) {
+    return (
+      <Card className="glass-card p-8 text-center">
+        <p className="text-slate-400">Please log in to view your support tickets.</p>
+      </Card>
+    );
   }
 
   return (
     <Card className="glass-card">
       <CardHeader>
-        <CardTitle className="text-slate-100">Your Support Tickets</CardTitle>
+        <CardTitle className="text-slate-100">{isAdmin ? "All Support Tickets" : "Your Support Tickets"}</CardTitle>
         <CardDescription className="text-slate-400">Track and manage your support requests</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -115,7 +189,7 @@ export function TicketList() {
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="glass-input w-[140px]">
                 <Filter className="h-4 w-4 mr-2" />
-                <SelectValue />
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent className="glass-dropdown">
                 <SelectItem value="all">All Status</SelectItem>
@@ -123,12 +197,13 @@ export function TicketList() {
                 <SelectItem value="in-progress">In Progress</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
               </SelectContent>
             </Select>
 
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
               <SelectTrigger className="glass-input w-[140px]">
-                <SelectValue />
+                <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent className="glass-dropdown">
                 <SelectItem value="all">All Priority</SelectItem>
@@ -142,29 +217,37 @@ export function TicketList() {
         </div>
 
         {/* Tickets List */}
-        <div className="space-y-4">
-          {filteredTickets.length === 0 ? (
-            <div className="text-center py-8">
-              <MessageSquare className="h-12 w-12 text-slate-600 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-slate-300 mb-2">No tickets found</h3>
-              <p className="text-slate-400">
-                {searchTerm || statusFilter !== "all" || priorityFilter !== "all"
-                  ? "Try adjusting your search or filters"
-                  : "You haven't created any support tickets yet"}
-              </p>
-            </div>
-          ) : (
-            filteredTickets.map((ticket) => (
+        {loading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        ) : error ? (
+          <InlineError message={error} onRetry={fetchTickets} />
+        ) : filteredTickets.length === 0 ? (
+          <div className="text-center py-8">
+            <MessageSquare className="h-12 w-12 text-slate-600 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-slate-300 mb-2">No tickets found</h3>
+            <p className="text-slate-400">
+              {searchTerm || statusFilter !== "all" || priorityFilter !== "all"
+                ? "Try adjusting your search or filters"
+                : "You haven't created any support tickets yet"}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredTickets.map((ticket) => (
               <Card key={ticket.id} className="glass-card border-slate-700 hover:border-slate-600 transition-colors">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="font-semibold text-slate-100">{ticket.subject}</h3>
-                        <Badge className={statusColors[ticket.status as keyof typeof statusColors]}>
+                        <Badge className={statusColors[ticket.status]}>
                           {ticket.status.replace("-", " ")}
                         </Badge>
-                        <Badge className={priorityColors[ticket.priority as keyof typeof priorityColors]}>
+                        <Badge className={priorityColors[ticket.priority]}>
                           {ticket.priority}
                         </Badge>
                       </div>
@@ -181,26 +264,28 @@ export function TicketList() {
                       <div className="flex items-center gap-4 text-xs text-slate-500">
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          <span>Created {formatDate(ticket.created)}</span>
+                          <span>Created {formatDate(ticket.created_at)}</span>
                         </div>
-                        <span>Updated {formatDate(ticket.updated)}</span>
+                        <span>Updated {formatDate(ticket.updated_at)}</span>
                       </div>
                     </div>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-slate-600 hover:border-slate-500 bg-transparent"
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      View
-                    </Button>
+                    <Link href={`/support/${ticket.id}`}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-slate-600 hover:border-slate-500 bg-transparent"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        View
+                      </Button>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
