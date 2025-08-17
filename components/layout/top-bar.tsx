@@ -12,11 +12,11 @@ import {
 import { useAuth } from "@/hooks/use-auth"
 import { Breadcrumb } from "./breadcrumb"
 import { usePathname } from "next/navigation"
-import { useUser } from "@/hooks/use-user" // Import the new hook
+import { useUser } from "@/hooks/use-user"
 
 export function TopBar() {
   const { logout } = useAuth()
-  const { user, profile, isLoading: isUserLoading } = useUser() // Use the new useUser hook
+  const { user, profile, isLoading: isUserLoading } = useUser()
   const pathname = usePathname()
 
   const showBreadcrumb = pathname.startsWith("/docs") || pathname.startsWith("/admin") || pathname.startsWith("/store") || pathname.startsWith("/vps/")

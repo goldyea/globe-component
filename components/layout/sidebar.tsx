@@ -3,13 +3,14 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Server, Plus, BookOpen, Settings, User, HelpCircle, FileText, ShieldCheck } from "lucide-react"
-import { useUser } from "@/hooks/use-user" // Import useUser
+import { LayoutDashboard, Server, Plus, BookOpen, Settings, User, HelpCircle, FileText, ShieldCheck, DollarSign } from "lucide-react" // Import DollarSign
+import { useUser } from "@/hooks/use-user"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "VPS", href: "/vps", icon: Server },
   { name: "Create VPS", href: "/vps/create", icon: Plus },
+  { name: "Resource Store", href: "/store", icon: DollarSign }, // Added Resource Store
   { name: "Documentation", href: "/docs", icon: BookOpen },
   { name: "Support", href: "/support", icon: HelpCircle },
   { name: "Terms", href: "/terms", icon: FileText },
@@ -19,7 +20,7 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname()
-  const { isAdmin, isLoading: isUserLoading } = useUser() // Use the useUser hook
+  const { isAdmin, isLoading: isUserLoading } = useUser()
 
   return (
     <div className="glass-sidebar w-64 min-h-screen p-6 fixed left-0 top-0 z-40">

@@ -13,6 +13,9 @@ import { Slider } from "@/components/ui/slider"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Server, Cpu, Zap, Globe, Loader2 } from "lucide-react"
+import { useUser } from "@/hooks/use-user"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 const operatingSystems = [
   { id: "ubuntu-22.04", name: "Ubuntu 22.04 LTS", icon: "🐧", popular: true },
@@ -33,12 +36,15 @@ const datacenters = [
 
 export function CreateVPSForm() {
   const router = useRouter()
+  const supabase = createClient()
+  const { user, profile, isLoading: isUserLoading, refetchProfile } = useUser()
+
   const [isCreating, setIsCreating] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
-    cpu: [2],
-    ram: [4],
-    storage: [40],
+    cpu: [1], // Default to 1 core
+    ram: [1], // Default to 1 GB
+    storage: [20], // Default to 20 GB
     os: "ubuntu-22.04",
     datacenter: "us-east-1",
     backups: false,
@@ -48,19 +54,85 @@ export function CreateVPSForm() {
     e.preventDefault()
     setIsCreating(true)
 
-    // Simulate VPS creation
-    await new Promise((resolve) => setTimeout(resolve, 3000))
+    if (!user || !profile) {
+      toast.error("You must be logged in and have a profile to create a VPS.")
+      setIsCreating(false)
+      return
+    }
 
-    // Redirect to VPS list
-    router.push("/vps")
+    const requiredCpu = formData.cpu[0]
+    const requiredRam = formData.ram[0]
+    const requiredStorage = formData.storage[0]
+
+    if (profile.credits_cpu_cores < requiredCpu || profile.credits_ram_gb < requiredRam || profile.credits_disk_gb < requiredStorage) {
+      toast.error("Insufficient credits for the selected configuration. Please purchase more resources.")
+      setIsCreating(false)
+      return
+    }
+
+    try {
+      // 1. Create VPS instance
+      const { data: vpsData, error: vpsError } = await supabase
+        .from("vps_instances")
+        .insert({
+          user_id: user.id,
+          name: formData.name,
+          cpu_cores: requiredCpu,
+          ram_gb: requiredRam,
+          storage_gb: requiredStorage,
+          os: formData.os,
+          datacenter: formData.datacenter,
+          status: "creating", // Initial status
+          // ip_address will be assigned by a backend service in a real app
+        })
+        .select()
+        .single()
+
+      if (vpsError) {
+        throw vpsError
+      }
+
+      // 2. Deduct credits from user profile
+      const { error: creditError } = await supabase
+        .from("user_profiles")
+        .update({
+          credits_cpu_cores: profile.credits_cpu_cores - requiredCpu,
+          credits_ram_gb: profile.credits_ram_gb - requiredRam,
+          credits_disk_gb: profile.credits_disk_gb - requiredStorage,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id)
+
+      if (creditError) {
+        // If credit deduction fails, you might want to roll back VPS creation
+        // For simplicity, we'll just log an error and let the user know.
+        console.error("Failed to deduct credits:", creditError)
+        toast.error("VPS created, but failed to deduct credits. Please contact support.")
+      } else {
+        toast.success("VPS instance created successfully! Credits deducted.")
+        refetchProfile() // Update displayed credits
+      }
+
+      router.push("/vps") // Redirect to VPS list
+    } catch (error: any) {
+      console.error("Error creating VPS:", error)
+      toast.error(`Failed to create VPS: ${error.message || "An unexpected error occurred."}`)
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   const calculatePrice = () => {
-    const basePrice = 8 + (formData.cpu[0] - 1) * 2 + (formData.ram[0] - 2) * 1.5
+    // This is a mock price calculation, actual price would depend on credit system
+    const basePrice = 8 + (formData.cpu[0] - 1) * 2 + (formData.ram[0] - 1) * 1.5
     const storagePrice = Math.max(0, formData.storage[0] - 20) * 0.1
     const backupPrice = formData.backups ? 3 : 0
     return (basePrice + storagePrice + backupPrice).toFixed(2)
   }
+
+  const currentRamCredits = profile?.credits_ram_gb ?? 0;
+  const currentDiskCredits = profile?.credits_disk_gb ?? 0;
+  const currentCpuCredits = profile?.credits_cpu_cores ?? 0;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -105,20 +177,20 @@ export function CreateVPSForm() {
             <div className="flex items-center justify-between">
               <Label className="text-slate-200">CPU Cores</Label>
               <Badge variant="secondary" className="bg-slate-700 text-slate-200">
-                {formData.cpu[0]} {formData.cpu[0] === 1 ? "Core" : "Cores"}
+                {formData.cpu[0]} {formData.cpu[0] === 1 ? "Core" : "Cores"} (Available: {currentCpuCredits})
               </Badge>
             </div>
             <Slider
               value={formData.cpu}
               onValueChange={(value) => setFormData({ ...formData, cpu: value })}
-              max={8}
+              max={currentCpuCredits > 8 ? currentCpuCredits : 8} // Max slider value is 8 or current credits if higher
               min={1}
               step={1}
               className="slider-blue"
             />
             <div className="flex justify-between text-xs text-slate-400">
               <span>1 Core</span>
-              <span>8 Cores</span>
+              <span>{currentCpuCredits > 8 ? currentCpuCredits : 8} Cores</span>
             </div>
           </div>
 
@@ -127,20 +199,20 @@ export function CreateVPSForm() {
             <div className="flex items-center justify-between">
               <Label className="text-slate-200">RAM</Label>
               <Badge variant="secondary" className="bg-slate-700 text-slate-200">
-                {formData.ram[0]} GB
+                {formData.ram[0]} GB (Available: {currentRamCredits})
               </Badge>
             </div>
             <Slider
               value={formData.ram}
               onValueChange={(value) => setFormData({ ...formData, ram: value })}
-              max={32}
-              min={2}
-              step={2}
+              max={currentRamCredits > 32 ? currentRamCredits : 32} // Max slider value is 32 or current credits if higher
+              min={1}
+              step={1}
               className="slider-green"
             />
             <div className="flex justify-between text-xs text-slate-400">
-              <span>2 GB</span>
-              <span>32 GB</span>
+              <span>1 GB</span>
+              <span>{currentRamCredits > 32 ? currentRamCredits : 32} GB</span>
             </div>
           </div>
 
@@ -149,20 +221,20 @@ export function CreateVPSForm() {
             <div className="flex items-center justify-between">
               <Label className="text-slate-200">SSD Storage</Label>
               <Badge variant="secondary" className="bg-slate-700 text-slate-200">
-                {formData.storage[0]} GB
+                {formData.storage[0]} GB (Available: {currentDiskCredits})
               </Badge>
             </div>
             <Slider
               value={formData.storage}
               onValueChange={(value) => setFormData({ ...formData, storage: value })}
-              max={500}
+              max={currentDiskCredits > 500 ? currentDiskCredits : 500} // Max slider value is 500 or current credits if higher
               min={20}
               step={10}
               className="slider-purple"
             />
             <div className="flex justify-between text-xs text-slate-400">
               <span>20 GB</span>
-              <span>500 GB</span>
+              <span>{currentDiskCredits > 500 ? currentDiskCredits : 500} GB</span>
             </div>
           </div>
         </CardContent>
@@ -274,7 +346,7 @@ export function CreateVPSForm() {
           </div>
           <Button
             type="submit"
-            disabled={isCreating || !formData.name.trim()}
+            disabled={isCreating || !formData.name.trim() || isUserLoading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 text-lg font-medium"
           >
             {isCreating ? (
