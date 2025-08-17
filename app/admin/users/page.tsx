@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Search, User, Plus, Minus, Ban, CheckCircle, Loader2 } from "lucide-react"
+import { Search, User, Plus, Minus, Ban, CheckCircle, Loader2, X } from "lucide-react" // Added X for non-admin icon
 import { createClient } from "@/lib/supabase/client"
 import { useUser } from "@/hooks/use-user"
 import { Skeleton } from "@/components/ui/loading-skeleton"
@@ -19,9 +19,7 @@ interface UserProfile {
   full_name: string | null
   company: string | null
   isAdmin: boolean
-  credits_ram_gb: number
-  credits_disk_gb: number
-  credits_cpu_cores: number
+  credits: number // Changed to a single credits field
   created_at: string
   updated_at: string
 }
@@ -35,7 +33,7 @@ export default function AdminUsersPage() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [editingCredits, setEditingCredits] = useState<string | null>(null)
-  const [creditChanges, setCreditChanges] = useState({ ram: 0, disk: 0, cpu: 0 })
+  const [creditChangeValue, setCreditChangeValue] = useState(0) // Single value for credits
   const [isUpdatingCredits, setIsUpdatingCredits] = useState(false)
   const [suspendingUserId, setSuspendingUserId] = useState<string | null>(null)
 
@@ -68,11 +66,7 @@ export default function AdminUsersPage() {
 
   const handleEditCredits = (user: UserProfile) => {
     setEditingCredits(user.id)
-    setCreditChanges({
-      ram: user.credits_ram_gb,
-      disk: user.credits_disk_gb,
-      cpu: user.credits_cpu_cores,
-    })
+    setCreditChangeValue(user.credits) // Set initial value to current credits
   }
 
   const handleSaveCredits = async (userId: string) => {
@@ -81,9 +75,7 @@ export default function AdminUsersPage() {
       const { error: updateError } = await supabase
         .from("user_profiles")
         .update({
-          credits_ram_gb: creditChanges.ram,
-          credits_disk_gb: creditChanges.disk,
-          credits_cpu_cores: creditChanges.cpu,
+          credits: creditChangeValue, // Update single credits field
           updated_at: new Date().toISOString(),
         })
         .eq("id", userId)
@@ -191,16 +183,14 @@ export default function AdminUsersPage() {
                 <TableHead className="text-slate-300">Username</TableHead>
                 <TableHead className="text-slate-300">Email</TableHead>
                 <TableHead className="text-slate-300">Admin</TableHead>
-                <TableHead className="text-slate-300">RAM (GB)</TableHead>
-                <TableHead className="text-slate-300">Disk (GB)</TableHead>
-                <TableHead className="text-slate-300">CPU (Cores)</TableHead>
+                <TableHead className="text-slate-300">Credits</TableHead> {/* Changed to Credits */}
                 <TableHead className="text-slate-300 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-slate-400 py-8">
+                  <TableCell colSpan={6} className="text-center text-slate-400 py-8"> {/* Adjusted colspan */}
                     No users found.
                   </TableCell>
                 </TableRow>
@@ -209,7 +199,7 @@ export default function AdminUsersPage() {
                   <TableRow key={u.id} className="border-slate-700/50">
                     <TableCell className="font-mono text-xs text-slate-300">{u.id.substring(0, 8)}...</TableCell>
                     <TableCell className="text-slate-200">{u.username || u.full_name || "N/A"}</TableCell>
-                    <TableCell className="text-slate-400">{u.user_id}</TableCell> {/* user_id is actually the auth.users.id, which is the email in this context */}
+                    <TableCell className="text-slate-400">{u.user_id}</TableCell>
                     <TableCell>
                       {u.isAdmin ? (
                         <CheckCircle className="h-4 w-4 text-green-400" />
@@ -221,36 +211,12 @@ export default function AdminUsersPage() {
                       {editingCredits === u.id ? (
                         <Input
                           type="number"
-                          value={creditChanges.ram}
-                          onChange={(e) => setCreditChanges({ ...creditChanges, ram: parseInt(e.target.value) || 0 })}
+                          value={creditChangeValue}
+                          onChange={(e) => setCreditChangeValue(parseInt(e.target.value) || 0)}
                           className="glass-input w-20 h-8 text-center"
                         />
                       ) : (
-                        u.credits_ram_gb
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingCredits === u.id ? (
-                        <Input
-                          type="number"
-                          value={creditChanges.disk}
-                          onChange={(e) => setCreditChanges({ ...creditChanges, disk: parseInt(e.target.value) || 0 })}
-                          className="glass-input w-20 h-8 text-center"
-                        />
-                      ) : (
-                        u.credits_disk_gb
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingCredits === u.id ? (
-                        <Input
-                          type="number"
-                          value={creditChanges.cpu}
-                          onChange={(e) => setCreditChanges({ ...creditChanges, cpu: parseInt(e.target.value) || 0 })}
-                          className="glass-input w-20 h-8 text-center"
-                        />
-                      ) : (
-                        u.credits_cpu_cores
+                        u.credits // Display single credits
                       )}
                     </TableCell>
                     <TableCell className="text-right">

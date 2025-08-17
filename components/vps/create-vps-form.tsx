@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Server, Cpu, Zap, Globe, Loader2 } from "lucide-react"
+import { Server, Cpu, Zap, Globe, Loader2, HardDrive, MemoryStick } from "lucide-react" // Added HardDrive, MemoryStick
 import { useUser } from "@/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
@@ -34,6 +34,11 @@ const datacenters = [
   { id: "ap-southeast-1", name: "Singapore", flag: "🇸🇬", ping: "22ms" },
 ]
 
+// Define credit costs per unit
+const CREDIT_COST_RAM_GB = 10;
+const CREDIT_COST_DISK_GB = 5;
+const CREDIT_COST_CPU_CORE = 20; // CPU cores still consume credits for VPS creation
+
 export function CreateVPSForm() {
   const router = useRouter()
   const supabase = createClient()
@@ -50,6 +55,13 @@ export function CreateVPSForm() {
     backups: false,
   })
 
+  const calculateTotalCreditsNeeded = () => {
+    const ramCredits = formData.ram[0] * CREDIT_COST_RAM_GB;
+    const diskCredits = formData.storage[0] * CREDIT_COST_DISK_GB;
+    const cpuCredits = formData.cpu[0] * CREDIT_COST_CPU_CORE;
+    return ramCredits + diskCredits + cpuCredits;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsCreating(true)
@@ -60,12 +72,10 @@ export function CreateVPSForm() {
       return
     }
 
-    const requiredCpu = formData.cpu[0]
-    const requiredRam = formData.ram[0]
-    const requiredStorage = formData.storage[0]
+    const totalCreditsNeeded = calculateTotalCreditsNeeded();
 
-    if (profile.credits_cpu_cores < requiredCpu || profile.credits_ram_gb < requiredRam || profile.credits_disk_gb < requiredStorage) {
-      toast.error("Insufficient credits for the selected configuration. Please purchase more resources.")
+    if (profile.credits < totalCreditsNeeded) {
+      toast.error(`Insufficient credits for the selected configuration. You need ${totalCreditsNeeded} credits, but have ${profile.credits}. Please purchase more credits.`)
       setIsCreating(false)
       return
     }
@@ -77,9 +87,9 @@ export function CreateVPSForm() {
         .insert({
           user_id: user.id,
           name: formData.name,
-          cpu_cores: requiredCpu,
-          ram_gb: requiredRam,
-          storage_gb: requiredStorage,
+          cpu_cores: formData.cpu[0],
+          ram_gb: formData.ram[0],
+          storage_gb: formData.storage[0],
           os: formData.os,
           datacenter: formData.datacenter,
           status: "creating", // Initial status
@@ -96,9 +106,7 @@ export function CreateVPSForm() {
       const { error: creditError } = await supabase
         .from("user_profiles")
         .update({
-          credits_cpu_cores: profile.credits_cpu_cores - requiredCpu,
-          credits_ram_gb: profile.credits_ram_gb - requiredRam,
-          credits_disk_gb: profile.credits_disk_gb - requiredStorage,
+          credits: profile.credits - totalCreditsNeeded, // Deduct from single credits field
           updated_at: new Date().toISOString(),
         })
         .eq("id", user.id)
@@ -124,15 +132,11 @@ export function CreateVPSForm() {
 
   const calculatePrice = () => {
     // This is a mock price calculation, actual price would depend on credit system
-    const basePrice = 8 + (formData.cpu[0] - 1) * 2 + (formData.ram[0] - 1) * 1.5
-    const storagePrice = Math.max(0, formData.storage[0] - 20) * 0.1
-    const backupPrice = formData.backups ? 3 : 0
-    return (basePrice + storagePrice + backupPrice).toFixed(2)
+    // For now, we'll just show the total credits needed as the "price"
+    return calculateTotalCreditsNeeded();
   }
 
-  const currentRamCredits = profile?.credits_ram_gb ?? 0;
-  const currentDiskCredits = profile?.credits_disk_gb ?? 0;
-  const currentCpuCredits = profile?.credits_cpu_cores ?? 0;
+  const currentCredits = profile?.credits ?? 0;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -177,20 +181,20 @@ export function CreateVPSForm() {
             <div className="flex items-center justify-between">
               <Label className="text-slate-200">CPU Cores</Label>
               <Badge variant="secondary" className="bg-slate-700 text-slate-200">
-                {formData.cpu[0]} {formData.cpu[0] === 1 ? "Core" : "Cores"} (Available: {currentCpuCredits})
+                {formData.cpu[0]} {formData.cpu[0] === 1 ? "Core" : "Cores"} (Cost: {formData.cpu[0] * CREDIT_COST_CPU_CORE} Credits)
               </Badge>
             </div>
             <Slider
               value={formData.cpu}
               onValueChange={(value) => setFormData({ ...formData, cpu: value })}
-              max={currentCpuCredits > 8 ? currentCpuCredits : 8} // Max slider value is 8 or current credits if higher
+              max={Math.floor(currentCredits / CREDIT_COST_CPU_CORE) > 8 ? Math.floor(currentCredits / CREDIT_COST_CPU_CORE) : 8} // Max slider value is 8 or current credits if higher
               min={1}
               step={1}
               className="slider-blue"
             />
             <div className="flex justify-between text-xs text-slate-400">
               <span>1 Core</span>
-              <span>{currentCpuCredits > 8 ? currentCpuCredits : 8} Cores</span>
+              <span>{Math.floor(currentCredits / CREDIT_COST_CPU_CORE) > 8 ? Math.floor(currentCredits / CREDIT_COST_CPU_CORE) : 8} Cores</span>
             </div>
           </div>
 
@@ -199,20 +203,20 @@ export function CreateVPSForm() {
             <div className="flex items-center justify-between">
               <Label className="text-slate-200">RAM</Label>
               <Badge variant="secondary" className="bg-slate-700 text-slate-200">
-                {formData.ram[0]} GB (Available: {currentRamCredits})
+                {formData.ram[0]} GB (Cost: {formData.ram[0] * CREDIT_COST_RAM_GB} Credits)
               </Badge>
             </div>
             <Slider
               value={formData.ram}
               onValueChange={(value) => setFormData({ ...formData, ram: value })}
-              max={currentRamCredits > 32 ? currentRamCredits : 32} // Max slider value is 32 or current credits if higher
+              max={Math.floor(currentCredits / CREDIT_COST_RAM_GB) > 32 ? Math.floor(currentCredits / CREDIT_COST_RAM_GB) : 32} // Max slider value is 32 or current credits if higher
               min={1}
               step={1}
               className="slider-green"
             />
             <div className="flex justify-between text-xs text-slate-400">
               <span>1 GB</span>
-              <span>{currentRamCredits > 32 ? currentRamCredits : 32} GB</span>
+              <span>{Math.floor(currentCredits / CREDIT_COST_RAM_GB) > 32 ? Math.floor(currentCredits / CREDIT_COST_RAM_GB) : 32} GB</span>
             </div>
           </div>
 
@@ -221,20 +225,20 @@ export function CreateVPSForm() {
             <div className="flex items-center justify-between">
               <Label className="text-slate-200">SSD Storage</Label>
               <Badge variant="secondary" className="bg-slate-700 text-slate-200">
-                {formData.storage[0]} GB (Available: {currentDiskCredits})
+                {formData.storage[0]} GB (Cost: {formData.storage[0] * CREDIT_COST_DISK_GB} Credits)
               </Badge>
             </div>
             <Slider
               value={formData.storage}
               onValueChange={(value) => setFormData({ ...formData, storage: value })}
-              max={currentDiskCredits > 500 ? currentDiskCredits : 500} // Max slider value is 500 or current credits if higher
+              max={Math.floor(currentCredits / CREDIT_COST_DISK_GB) > 500 ? Math.floor(currentCredits / CREDIT_COST_DISK_GB) : 500} // Max slider value is 500 or current credits if higher
               min={20}
               step={10}
               className="slider-purple"
             />
             <div className="flex justify-between text-xs text-slate-400">
               <span>20 GB</span>
-              <span>{currentDiskCredits > 500 ? currentDiskCredits : 500} GB</span>
+              <span>{Math.floor(currentCredits / CREDIT_COST_DISK_GB) > 500 ? Math.floor(currentCredits / CREDIT_COST_DISK_GB) : 500} GB</span>
             </div>
           </div>
         </CardContent>
@@ -340,13 +344,13 @@ export function CreateVPSForm() {
               <p className="text-slate-400">Your VPS will be ready in under 60 seconds</p>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-blue-400">${calculatePrice()}/mo</div>
-              <div className="text-sm text-slate-400">Billed monthly</div>
+              <div className="text-2xl font-bold text-blue-400">{calculatePrice()} Credits</div>
+              <div className="text-sm text-slate-400">Total cost</div>
             </div>
           </div>
           <Button
             type="submit"
-            disabled={isCreating || !formData.name.trim() || isUserLoading}
+            disabled={isCreating || !formData.name.trim() || isUserLoading || currentCredits < calculateTotalCreditsNeeded()}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 text-lg font-medium"
           >
             {isCreating ? (

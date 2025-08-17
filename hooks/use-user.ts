@@ -11,9 +11,7 @@ interface UserProfile {
   full_name: string | null
   company: string | null
   isAdmin: boolean
-  credits_ram_gb: number
-  credits_disk_gb: number
-  credits_cpu_cores: number
+  credits: number // Changed to a single credits field
   created_at: string
   updated_at: string
 }

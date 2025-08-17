@@ -91,7 +91,8 @@ export function TicketList() {
       const { data, error: fetchError } = await query;
 
       if (fetchError) {
-        throw fetchError;
+        // Safely access error message or provide a default
+        throw new Error(fetchError.message || "An unknown error occurred while fetching tickets.");
       }
 
       const formattedTickets: SupportTicket[] = data.map((ticket: any) => ({

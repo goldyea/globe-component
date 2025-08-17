@@ -3,31 +3,22 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, HardDrive, Cpu, Zap } from "lucide-react"
+import { PlusCircle, DollarSign } from "lucide-react" // Changed icons
 
 interface ResourceCardProps {
   title: string
   description: string
   price: number
-  amount: number
-  unit: string
-  type: "ram" | "disk" | "cpu"
+  amount: number // Amount of credits
+  unit: string // e.g., "Credits"
   features: string[]
-  onPurchase: (type: "ram" | "disk" | "cpu", amount: number, price: number) => void
+  onPurchase: (amount: number, price: number) => void // Simplified onPurchase
   isPurchasing: boolean
 }
 
-const typeIcons = {
-  ram: <Zap className="h-6 w-6 text-blue-400" />,
-  disk: <HardDrive className="h-6 w-6 text-green-400" />,
-  cpu: <Cpu className="h-6 w-6 text-purple-400" />,
-}
-
-const typeColors = {
-  ram: "bg-blue-600/20 text-blue-400 border-blue-500/30",
-  disk: "bg-green-600/20 text-green-400 border-green-500/30",
-  cpu: "bg-purple-600/20 text-purple-400 border-purple-500/30",
-}
+// Simplified typeIcons and typeColors as it's now generic credits
+const cardIcon = <DollarSign className="h-6 w-6 text-green-400" />
+const cardColor = "bg-green-600/20 text-green-400 border-green-500/30"
 
 export function ResourceCard({
   title,
@@ -35,16 +26,15 @@ export function ResourceCard({
   price,
   amount,
   unit,
-  type,
   features,
   onPurchase,
   isPurchasing,
 }: ResourceCardProps) {
   return (
-    <Card className={`glass-card ${typeColors[type]}`}>
+    <Card className={`glass-card ${cardColor}`}>
       <CardHeader className="text-center">
         <div className="mx-auto mb-3 p-3 rounded-full bg-slate-800/50 w-fit">
-          {typeIcons[type]}
+          {cardIcon}
         </div>
         <CardTitle className="text-slate-100 text-2xl">{title}</CardTitle>
         <CardDescription className="text-slate-400">{description}</CardDescription>
@@ -65,8 +55,8 @@ export function ResourceCard({
       </CardContent>
       <CardFooter>
         <Button
-          className={`w-full ${typeColors[type].replace("/20", "").replace("border-", "")} text-white`}
-          onClick={() => onPurchase(type, amount, price)}
+          className={`w-full ${cardColor.replace("/20", "").replace("border-", "")} text-white`}
+          onClick={() => onPurchase(amount, price)}
           disabled={isPurchasing}
         >
           {isPurchasing ? (
@@ -75,7 +65,7 @@ export function ResourceCard({
               Purchasing...
             </>
           ) : (
-            `Purchase ${amount}${unit}`
+            `Purchase ${amount} ${unit}`
           )}
         </Button>
       </CardFooter>

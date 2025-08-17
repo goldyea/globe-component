@@ -7,14 +7,14 @@ import { useUser } from "@/hooks/use-user"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, DollarSign } from "lucide-react" // Added DollarSign for display
 
 export default function StorePage() {
   const { user, profile, isLoading: isUserLoading, refetchProfile } = useUser()
   const supabase = createClient()
   const [isPurchasing, setIsPurchasing] = useState(false)
 
-  const handlePurchase = async (type: "ram" | "disk" | "cpu", amount: number, price: number) => {
+  const handlePurchase = async (amount: number, price: number) => { // Simplified parameters
     if (!user) {
       toast.error("You must be logged in to purchase resources.")
       return
@@ -22,29 +22,22 @@ export default function StorePage() {
     setIsPurchasing(true)
 
     try {
-      let updateData: { [key: string]: number } = {}
-      if (type === "ram") {
-        updateData.credits_ram_gb = (profile?.credits_ram_gb || 0) + amount
-      } else if (type === "disk") {
-        updateData.credits_disk_gb = (profile?.credits_disk_gb || 0) + amount
-      } else if (type === "cpu") {
-        updateData.credits_cpu_cores = (profile?.credits_cpu_cores || 0) + amount
-      }
-
       const { error } = await supabase
         .from("user_profiles")
-        .update(updateData)
+        .update({
+          credits: (profile?.credits || 0) + amount, // Update single credits field
+        })
         .eq("id", user.id)
 
       if (error) {
         throw error
       }
 
-      toast.success(`Successfully purchased ${amount}${type.toUpperCase()}! Credits updated.`)
+      toast.success(`Successfully purchased ${amount} credits! Your balance has been updated.`)
       refetchProfile() // Re-fetch user profile to update displayed credits
     } catch (error: any) {
-      console.error("Error purchasing resource:", error)
-      toast.error(`Failed to purchase resource: ${error.message || "An unexpected error occurred."}`)
+      console.error("Error purchasing credits:", error)
+      toast.error(`Failed to purchase credits: ${error.message || "An unexpected error occurred."}`)
     } finally {
       setIsPurchasing(false)
     }
@@ -52,31 +45,28 @@ export default function StorePage() {
 
   const resourcePackages = [
     {
-      title: "RAM Boost",
-      description: "Add more memory to your account for powerful applications.",
+      title: "Small Credit Pack",
+      description: "Add a small amount of credits to your balance.",
       price: 5.00,
-      amount: 4,
-      unit: "GB",
-      type: "ram" as const,
-      features: ["4 GB additional RAM", "Instant credit", "One-time purchase"],
+      amount: 100,
+      unit: "Credits",
+      features: ["100 Credits", "Instant credit", "One-time purchase"],
     },
     {
-      title: "Disk Expansion",
-      description: "Expand your storage capacity for large files and databases.",
-      price: 10.00,
-      amount: 50,
-      unit: "GB",
-      type: "disk" as const,
-      features: ["50 GB additional SSD storage", "Instant credit", "One-time purchase"],
+      title: "Medium Credit Pack",
+      description: "Boost your balance with a medium credit pack.",
+      price: 20.00,
+      amount: 500,
+      unit: "Credits",
+      features: ["500 Credits", "Instant credit", "Best value"],
     },
     {
-      title: "CPU Upgrade",
-      description: "Boost your processing power for demanding tasks.",
-      price: 8.00,
-      amount: 2,
-      unit: "Cores",
-      type: "cpu" as const,
-      features: ["2 additional CPU cores", "Instant credit", "One-time purchase"],
+      title: "Large Credit Pack",
+      description: "Maximize your resources with a large credit pack.",
+      price: 40.00,
+      amount: 1200,
+      unit: "Credits",
+      features: ["1200 Credits", "Instant credit", "Great for large projects"],
     },
   ]
 
@@ -86,7 +76,7 @@ export default function StorePage() {
         <div className="text-center">
           <h1 className="text-4xl font-bold text-slate-100 mb-4">Resource Store</h1>
           <p className="text-xl text-slate-300 max-w-2xl mx-auto">
-            Purchase additional RAM, Disk, and CPU credits for your account.
+            Purchase additional credits for your account to create and manage VPS instances.
           </p>
         </div>
 
@@ -104,19 +94,10 @@ export default function StorePage() {
                 <span className="ml-2 text-slate-400">Loading credits...</span>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                <div>
-                  <p className="text-3xl font-bold text-blue-400">{profile?.credits_ram_gb ?? 0} GB</p>
-                  <p className="text-sm text-slate-400">Available RAM</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-green-400">{profile?.credits_disk_gb ?? 0} GB</p>
-                  <p className="text-sm text-slate-400">Available Disk</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-purple-400">{profile?.credits_cpu_cores ?? 0} Cores</p>
-                  <p className="text-sm text-slate-400">Available CPU</p>
-                </div>
+              <div className="flex justify-center items-center gap-4">
+                <DollarSign className="h-8 w-8 text-green-400" />
+                <p className="text-4xl font-bold text-slate-100">{profile?.credits ?? 0}</p>
+                <p className="text-xl text-slate-400">Credits</p>
               </div>
             )}
           </CardContent>
