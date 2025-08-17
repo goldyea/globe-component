@@ -3,14 +3,14 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Server, Plus, BookOpen, Settings, User, HelpCircle, FileText, ShieldCheck } from "lucide-react" // Removed DollarSign import
+import { LayoutDashboard, Server, Plus, BookOpen, Settings, User, HelpCircle, FileText, ShieldCheck, DollarSign } from "lucide-react" // Re-added DollarSign import
 import { useUser } from "@/hooks/use-user"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "VPS", href: "/vps", icon: Server },
   { name: "Create VPS", href: "/vps/create", icon: Plus },
-  { name: "Resource Store", href: "/store", icon: DollarSign }, // Still referencing DollarSign for icon, but it's imported in ResourceCard
+  { name: "Resource Store", href: "/store", icon: DollarSign },
   { name: "Documentation", href: "/docs", icon: BookOpen },
   { name: "Support", href: "/support", icon: HelpCircle },
   { name: "Terms", href: "/terms", icon: FileText },
