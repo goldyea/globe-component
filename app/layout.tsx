@@ -17,15 +17,9 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <head>
-        <style>{`
-html {
-  font-family: ${GeistSans.style.fontFamily};
-  --font-sans: ${GeistSans.variable};
-  --font-mono: ${GeistMono.variable};
-}
-        `}</style>
+        {/* The style tag for Geist fonts is no longer needed here as variables are applied via className */}
       </head>
       <body className="bg-slate-950 text-slate-100" suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
