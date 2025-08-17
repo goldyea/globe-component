@@ -3,7 +3,8 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Server, Plus, BookOpen, Settings, User, HelpCircle, FileText } from "lucide-react"
+import { LayoutDashboard, Server, Plus, BookOpen, Settings, User, HelpCircle, FileText, ShieldCheck } from "lucide-react"
+import { useUser } from "@/hooks/use-user" // Import useUser
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -18,6 +19,7 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { isAdmin, isLoading: isUserLoading } = useUser() // Use the useUser hook
 
   return (
     <div className="glass-sidebar w-64 min-h-screen p-6 fixed left-0 top-0 z-40">
@@ -45,6 +47,20 @@ export function Sidebar() {
             </Link>
           )
         })}
+        {!isUserLoading && isAdmin && (
+          <Link
+            href="/admin"
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200",
+              pathname.startsWith("/admin")
+                ? "bg-purple-600/20 text-purple-400 border border-purple-500/30"
+                : "text-slate-300 hover:text-slate-100 hover:bg-slate-800/50",
+            )}
+          >
+            <ShieldCheck className="h-5 w-5" />
+            Admin Panel
+          </Link>
+        )}
       </nav>
     </div>
   )

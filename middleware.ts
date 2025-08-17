@@ -35,6 +35,7 @@ export async function middleware(request: NextRequest) {
 
   // Protected routes - redirect to login if not authenticated
   const isAuthRoute = request.nextUrl.pathname.startsWith("/auth/")
+  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin")
   const isPublicRoute =
     request.nextUrl.pathname === "/" ||
     request.nextUrl.pathname.startsWith("/terms") ||
@@ -47,6 +48,21 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
     return NextResponse.redirect(url)
+  }
+
+  // Admin route protection
+  if (user && isAdminRoute) {
+    const { data: profile, error } = await supabase
+      .from("user_profiles")
+      .select("isAdmin")
+      .eq("id", user.id)
+      .single()
+
+    if (error || !profile?.isAdmin) {
+      const url = request.nextUrl.clone()
+      url.pathname = "/dashboard" // Redirect non-admins to dashboard
+      return NextResponse.redirect(url)
+    }
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
